@@ -8,7 +8,7 @@
 import type { CameraInfo } from '@lancam/shared';
 import { SignalingClient } from '../../lib/signaling-client.js';
 import { icons } from '../../lib/icons.js';
-import { navigate } from '../../main.js';
+import { navigate, getBasePrefix } from '../../main.js';
 
 interface DashboardState {
   sessionId: string;
@@ -172,7 +172,8 @@ async function loadSession(): Promise<void> {
     state.obsHttpsUrls = data.obsHttpsUrls || {};
     state.joinCode = data.session.joinCode;
 
-    const baseUrl = `${window.location.protocol}//${window.location.host}`;
+    const basePrefix = getBasePrefix();
+    const baseUrl = `${window.location.protocol}//${window.location.host}${basePrefix}`;
     state.joinUrl = `${baseUrl}/join/${state.joinCode}`;
 
     const stored = localStorage.getItem(`lancam-session-${state.sessionId}`);
