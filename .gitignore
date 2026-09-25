@@ -34,3 +34,7 @@ coverage/
 # Temporary
 tmp/
 temp/
+
+#ignore deploy files
+.deploy-lancam.sh
+.deploy-zamedu.sh

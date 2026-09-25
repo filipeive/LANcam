@@ -1,18 +1,18 @@
 #!/bin/bash
 
 # Script de Deploy Automático do LANCam (Local Network Camera)
-# Servidor de Produção Oracle Cloud
+# Servidor de Produção Oracle Cloud — Diretório /var/www/html/lancam
 
 set -e
 
 SERVER_USER="ubuntu"
 SERVER_IP="146.235.224.99"
 SSH_KEY="$HOME/.ssh/oracle-2025"
-REMOTE_APP_DIR="/var/www/lancam"
+REMOTE_APP_DIR="/var/www/html/lancam"
 REPO_URL="git@github.com:filipeive/LANcam.git"
 
 echo "==================================================================="
-echo "   🚀 Deploy Automático — LANCam (Servidor Online)"
+echo "   🚀 Deploy Automático — LANCam (/var/www/html/lancam)"
 echo "==================================================================="
 echo ""
 echo "Servidor: $SERVER_USER@$SERVER_IP"
@@ -29,27 +29,30 @@ fi
 echo "🔐 Testando conexão SSH com o servidor..."
 ssh -i "$SSH_KEY" -o ConnectTimeout=10 "$SERVER_USER@$SERVER_IP" "echo '✅ Conexão SSH bem-sucedida!'"
 
-echo "📦 Executando rotina de deploy do LANCam no servidor remoto..."
+echo "📦 Executando rotina de deploy no servidor remoto..."
 ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" << 'ENDSSH'
 set -e
 
-# Criar diretório do app
-sudo mkdir -p /var/www/lancam
-sudo chown -R ubuntu:www-data /var/www/lancam
+# Criar diretório em /var/www/html/lancam
+sudo mkdir -p /var/www/html/lancam
+sudo chown -R ubuntu:www-data /var/www/html/lancam
 
-if [ ! -d "/var/www/lancam/.git" ]; then
-    echo "📥 Clonando repositório LANCam..."
-    git clone git@github.com:filipeive/LANcam.git /var/www/lancam
+if [ ! -d "/var/www/html/lancam/.git" ]; then
+    echo "📥 Clonando repositório LANCam em /var/www/html/lancam..."
+    git clone git@github.com:filipeive/LANcam.git /var/www/html/lancam
 else
-    echo "🔄 Atualizando repositório LANCam..."
-    cd /var/www/lancam
+    echo "🔄 Atualizando repositório LANCam em /var/www/html/lancam..."
+    cd /var/www/html/lancam
     git fetch origin
     git reset --hard origin/main
 fi
 
-cd /var/www/lancam
+cd /var/www/html/lancam
 
-# Garantir que o Node.js e PM2 estão disponíveis
+# Garantir permissões
+sudo chown -R ubuntu:www-data /var/www/html/lancam
+
+# Instalando dependências npm e compilando
 echo "📦 Instalando dependências npm..."
 npm install
 
@@ -61,7 +64,7 @@ if [ ! -f .env ]; then
     cp .env.example .env
 fi
 
-# Garantir serviço PM2 ativo para o servidor de sinalização Node
+# Gerenciar processo PM2 para o servidor de sinalização Node
 echo "⚡ Gerenciando processo Node.js com PM2..."
 if ! command -v pm2 &> /dev/null; then
     sudo npm install -g pm2
@@ -69,57 +72,48 @@ fi
 
 pm2 delete lancam-server 2>/dev/null || true
 pm2 start npm --name "lancam-server" -- start
-
 pm2 save
 
-# Configurar Nginx para LANCam
-echo "🌐 Configurando Nginx para LANCam..."
-sudo bash -c 'cat > /etc/nginx/sites-available/lancam << "NGINXEOF"
-server {
-    listen 80;
-    server_name _;
+# Configurar Nginx em /etc/nginx/sites-available/default
+echo "🌐 Atualizando /etc/nginx/sites-available/default para incluir LANCam..."
 
-    location /lancam/ {
-        alias /var/www/lancam/apps/web/dist/;
-        try_files $uri $uri/ /index.html;
-    }
+# Verificar se a regra do lancam já está no default file, caso contrário adicionar
+if ! grep -q "location /lancam" /etc/nginx/sites-available/default; then
+    echo "Configurando blocos de rotas do LANCam no Nginx default..."
+    sudo sed -i '/server_name _;/a \
+\
+    location /lancam/ {\
+        alias /var/www/html/lancam/apps/web/dist/;\
+        try_files $uri $uri/ /lancam/index.html;\
+    }\
+\
+    location /api/ {\
+        proxy_pass http://127.0.0.1:3478;\
+        proxy_http_version 1.1;\
+        proxy_set_header Host $host;\
+        proxy_set_header X-Real-IP $remote_addr;\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\
+    }\
+\
+    location /ws {\
+        proxy_pass http://127.0.0.1:3478;\
+        proxy_http_version 1.1;\
+        proxy_set_header Upgrade $http_upgrade;\
+        proxy_set_header Connection "Upgrade";\
+        proxy_set_header Host $host;\
+        proxy_set_header X-Real-IP $remote_addr;\
+    }' /etc/nginx/sites-available/default
+fi
 
-    location /api/ {
-        proxy_pass http://127.0.0.1:3478;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-
-    location /ws {
-        proxy_pass http://127.0.0.1:3478;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "Upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    location / {
-        proxy_pass http://127.0.0.1:3478;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-NGINXEOF'
-
-sudo ln -sf /etc/nginx/sites-available/lancam /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl reload nginx
 
-echo "✅ Deploy do LANCam no servidor remoto concluído com sucesso!"
+echo "✅ Deploy do LANCam concluído com sucesso em /var/www/html/lancam!"
 ENDSSH
 
 echo ""
 echo "==================================================================="
 echo "   🎉 DEPLOY DO LANCAM CONCLUÍDO COM SUCESSO!"
 echo "==================================================================="
-echo "Aceda a: http://146.235.224.99"
+echo "Aceda a: http://146.235.224.99/lancam/"
 echo ""
