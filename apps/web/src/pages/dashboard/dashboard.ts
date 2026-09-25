@@ -8,6 +8,7 @@
 import type { CameraInfo } from '@lancam/shared';
 import { SignalingClient } from '../../lib/signaling-client.js';
 import { icons } from '../../lib/icons.js';
+import { navigate } from '../../main.js';
 
 interface DashboardState {
   sessionId: string;
@@ -47,7 +48,7 @@ export async function initDashboardPage(
     <div class="page">
       <header class="page-header">
         <div class="container flex items-center justify-between">
-          <div class="brand" style="cursor:pointer" onclick="window.location.href='/'">
+          <div class="brand" id="dashboard-brand-logo" style="cursor:pointer">
             <div class="brand-icon" style="width:28px;height:28px;font-size:var(--text-sm)">LC</div>
             <div class="brand-name" style="font-size:var(--text-lg)">LAN<span>Cam</span></div>
           </div>
@@ -129,7 +130,7 @@ export async function initDashboardPage(
             <div style="margin-bottom:var(--space-4);color:var(--color-text-muted)">${icons.alertCircle(48)}</div>
             <h3>Session Not Found</h3>
             <p class="text-secondary mt-4">This session may have expired or been deleted.</p>
-            <button class="btn btn-primary mt-6" onclick="window.location.href='/'">
+            <button class="btn btn-primary mt-6" id="go-home-btn">
               Go Home
             </button>
           </div>
@@ -137,6 +138,9 @@ export async function initDashboardPage(
       </main>
     </div>
   `;
+
+  document.getElementById('dashboard-brand-logo')?.addEventListener('click', () => navigate('/'));
+  document.getElementById('go-home-btn')?.addEventListener('click', () => navigate('/'));
 
   await loadSession();
 

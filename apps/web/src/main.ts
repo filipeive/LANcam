@@ -1,18 +1,35 @@
 /**
  * LANCam — Main Application Entry Point
  *
- * Simple hash-based router that loads the appropriate page
- * based on the URL path. No framework needed.
+ * Simple SPA router that loads the appropriate page based on URL path.
+ * Supports root base path prefixes (e.g. /lancam/ or /).
  */
 
 import './styles/global.css';
 
+export function getBasePrefix(): string {
+  const pathname = window.location.pathname;
+  if (pathname.startsWith('/lancam')) {
+    return '/lancam';
+  }
+  return '';
+}
+
 // Determine which page to load based on URL path
 async function route(): Promise<void> {
-  const path = window.location.pathname;
-  const app = document.getElementById('app')!;
+  const fullPath = window.location.pathname;
+  const basePrefix = getBasePrefix();
 
-  // Clear previous page
+  // Strip basePrefix if present
+  let path = basePrefix && fullPath.startsWith(basePrefix)
+    ? fullPath.slice(basePrefix.length)
+    : fullPath;
+
+  if (!path || !path.startsWith('/')) {
+    path = '/' + (path || '');
+  }
+
+  const app = document.getElementById('app')!;
   app.innerHTML = '';
 
   try {
@@ -61,7 +78,17 @@ async function route(): Promise<void> {
 
 // Navigate without full page reload
 export function navigate(path: string): void {
-  window.history.pushState({}, '', path);
+  const basePrefix = getBasePrefix();
+  let targetPath = path;
+
+  if (basePrefix) {
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    if (!cleanPath.startsWith(basePrefix)) {
+      targetPath = `${basePrefix}${cleanPath}`;
+    }
+  }
+
+  window.history.pushState({}, '', targetPath);
   route();
 }
 

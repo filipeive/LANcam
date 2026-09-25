@@ -114,7 +114,18 @@ export async function createServer(config: ServerConfig): Promise<{
       const { sessionId, joinCode, joinToken, dashboardToken } =
         sessionManager.createSession(body.name);
 
-      const joinUrl = `${baseUrl}/join/${joinCode}`;
+      let requestBase = baseUrl;
+      if (req.headers.origin || req.headers.referer) {
+        try {
+          const originUrl = new URL((req.headers.origin || req.headers.referer) as string);
+          const pathPrefix = originUrl.pathname.startsWith('/lancam') ? '/lancam' : '';
+          requestBase = `${originUrl.protocol}//${originUrl.host}${pathPrefix}`;
+        } catch {
+          // Fallback to default baseUrl
+        }
+      }
+
+      const joinUrl = `${requestBase}/join/${joinCode}`;
 
       // Generate QR code as data URL
       const qrCodeDataUrl = await QRCode.toDataURL(joinUrl, {
@@ -152,6 +163,19 @@ export async function createServer(config: ServerConfig): Promise<{
       return;
     }
 
+    let requestBase = baseUrl;
+    let httpReqBase = httpBaseUrl;
+    if (req.headers.origin || req.headers.referer) {
+      try {
+        const originUrl = new URL((req.headers.origin || req.headers.referer) as string);
+        const pathPrefix = originUrl.pathname.startsWith('/lancam') ? '/lancam' : '';
+        requestBase = `${originUrl.protocol}//${originUrl.host}${pathPrefix}`;
+        httpReqBase = `http://${originUrl.host}${pathPrefix}`;
+      } catch {
+        // Fallback
+      }
+    }
+
     // Build OBS URLs for each camera (HTTP by default for OBS CEF SSL compatibility, plus HTTPS option)
     const obsUrls: Record<string, string> = {};
     const obsHttpsUrls: Record<string, string> = {};
@@ -159,9 +183,9 @@ export async function createServer(config: ServerConfig): Promise<{
       const viewerToken = sessionManager.createViewerToken(session.sessionId, camera.cameraId);
       if (viewerToken) {
         obsUrls[camera.cameraId] =
-          `${httpBaseUrl}/camera/${camera.cameraId}/view?token=${viewerToken}&session=${session.sessionId}`;
+          `${httpReqBase}/camera/${camera.cameraId}/view?token=${viewerToken}&session=${session.sessionId}`;
         obsHttpsUrls[camera.cameraId] =
-          `${baseUrl}/camera/${camera.cameraId}/view?token=${viewerToken}&session=${session.sessionId}`;
+          `${requestBase}/camera/${camera.cameraId}/view?token=${viewerToken}&session=${session.sessionId}`;
       }
     }
 

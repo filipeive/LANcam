@@ -137,7 +137,7 @@ To generate signed native builds for store releases:
 - [x] **Phase 3**: Cross-platform Desktop App & Native Installers (Linux AppImage/DEB, Windows NSIS EXE, Android PWA)
 - [x] **Phase 4**: Production Cloud Deployment (Automated Oracle Cloud Nginx + PM2 script)
 - [x] **Phase 5**: QR Code Join & Low-latency WebRTC Optimization
-- [x] **Phase 6**: mDNS Local Discovery (`lancam.local`)
+- [x] **Phase 6**: mDNS Local Discovery (`lancam.lcal`)
 - [x] **Phase 7**: Native Mobile App Releases (Google Play Store & Apple App Store)
 
 ---

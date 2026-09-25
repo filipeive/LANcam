@@ -172,8 +172,7 @@ async function loadSessions(): Promise<void> {
       state: string;
       cameras: Array<{ cameraId: string }>;
     }) => `
-      <div class="card" style="margin-bottom:var(--space-3);cursor:pointer;padding:var(--space-4)"
-           onclick="window.location.href='/dashboard/${session.sessionId}'">
+      <div class="card session-card-item" data-session-id="${session.sessionId}" style="margin-bottom:var(--space-3);cursor:pointer;padding:var(--space-4)">
         <div class="flex items-center justify-between">
           <div>
             <div style="font-weight:600">${escapeHtml(session.sessionName)}</div>
@@ -187,6 +186,13 @@ async function loadSessions(): Promise<void> {
         </div>
       </div>
     `).join('');
+
+    list.querySelectorAll('.session-card-item').forEach((item) => {
+      item.addEventListener('click', () => {
+        const id = item.getAttribute('data-session-id');
+        if (id) navigate(`/dashboard/${id}`);
+      });
+    });
   } catch {
     // Silently fail — sessions list is not critical
   }
