@@ -102,6 +102,71 @@ export async function createServer(config: ServerConfig): Promise<{
     });
   });
 
+  // Helper to determine public base path prefix (e.g. /lancam)
+  function getPublicBasePath(req: express.Request): string {
+    if (process.env.PUBLIC_BASE_PATH) {
+      const envPath = process.env.PUBLIC_BASE_PATH.trim();
+      if (envPath && envPath !== '/') {
+        return envPath.startsWith('/') ? envPath.replace(/\/$/, '') : `/${envPath.replace(/\/$/, '')}`;
+      }
+    }
+
+    const forwardedPrefix = req.headers['x-forwarded-prefix'];
+    if (typeof forwardedPrefix === 'string' && forwardedPrefix) {
+      return forwardedPrefix.replace(/\/$/, '');
+    }
+
+    const referer = req.headers.referer;
+    if (typeof referer === 'string' && referer) {
+      try {
+        const refUrl = new URL(referer);
+        if (refUrl.pathname.startsWith('/lancam')) {
+          return '/lancam';
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    const origin = req.headers.origin;
+    if (typeof origin === 'string' && origin) {
+      try {
+        const origUrl = new URL(origin);
+        if (origUrl.pathname.startsWith('/lancam')) {
+          return '/lancam';
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    return '';
+  }
+
+  function getRequestBaseUrl(req: express.Request, fallbackBaseUrl: string, isHttps: boolean = true): string {
+    const pathPrefix = getPublicBasePath(req);
+    const hostHeader = (req.headers['x-forwarded-host'] || req.headers.host) as string | undefined;
+
+    if (hostHeader) {
+      const proto = isHttps
+        ? ((req.headers['x-forwarded-proto'] as string) || (req.secure ? 'https' : 'http'))
+        : 'http';
+      return `${proto}://${hostHeader}${pathPrefix}`;
+    }
+
+    if (req.headers.referer) {
+      try {
+        const refUrl = new URL(req.headers.referer);
+        const proto = isHttps ? refUrl.protocol : 'http:';
+        return `${proto}//${refUrl.host}${pathPrefix}`;
+      } catch {
+        // ignore
+      }
+    }
+
+    return `${fallbackBaseUrl}${pathPrefix}`;
+  }
+
   // Create session
   app.post('/api/sessions', async (req, res) => {
     try {
@@ -114,17 +179,7 @@ export async function createServer(config: ServerConfig): Promise<{
       const { sessionId, joinCode, joinToken, dashboardToken } =
         sessionManager.createSession(body.name);
 
-      let requestBase = baseUrl;
-      if (req.headers.origin || req.headers.referer) {
-        try {
-          const originUrl = new URL((req.headers.origin || req.headers.referer) as string);
-          const pathPrefix = originUrl.pathname.startsWith('/lancam') ? '/lancam' : '';
-          requestBase = `${originUrl.protocol}//${originUrl.host}${pathPrefix}`;
-        } catch {
-          // Fallback to default baseUrl
-        }
-      }
-
+      const requestBase = getRequestBaseUrl(req, baseUrl, true);
       const joinUrl = `${requestBase}/join/${joinCode}`;
 
       // Generate QR code as data URL
@@ -163,18 +218,8 @@ export async function createServer(config: ServerConfig): Promise<{
       return;
     }
 
-    let requestBase = baseUrl;
-    let httpReqBase = httpBaseUrl;
-    if (req.headers.origin || req.headers.referer) {
-      try {
-        const originUrl = new URL((req.headers.origin || req.headers.referer) as string);
-        const pathPrefix = originUrl.pathname.startsWith('/lancam') ? '/lancam' : '';
-        requestBase = `${originUrl.protocol}//${originUrl.host}${pathPrefix}`;
-        httpReqBase = `http://${originUrl.host}${pathPrefix}`;
-      } catch {
-        // Fallback
-      }
-    }
+    const requestBase = getRequestBaseUrl(req, baseUrl, true);
+    const httpReqBase = getRequestBaseUrl(req, httpBaseUrl, false);
 
     // Build OBS URLs for each camera (HTTP by default for OBS CEF SSL compatibility, plus HTTPS option)
     const obsUrls: Record<string, string> = {};

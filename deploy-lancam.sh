@@ -57,9 +57,13 @@ npm install
 echo "🛠️ Compilando aplicação monorepo..."
 VITE_BASE=/lancam/ npm run build
 
-# Criar ficheiro .env de produção se não existir
+# Criar/atualizar ficheiro .env de produção
 if [ ! -f .env ]; then
     cp .env.example .env
+fi
+
+if ! grep -q "PUBLIC_BASE_PATH" .env; then
+    echo "PUBLIC_BASE_PATH=/lancam" >> .env
 fi
 
 # Gerenciar processo PM2 para o servidor de sinalização Node
@@ -122,6 +126,7 @@ lancam_block = """
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Prefix /lancam;
     }
 
     location /ws {
