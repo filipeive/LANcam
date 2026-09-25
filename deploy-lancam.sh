@@ -69,7 +69,7 @@ if ! command -v pm2 &> /dev/null; then
 fi
 
 pm2 delete lancam-server 2>/dev/null || true
-pm2 start apps/server/dist/index.js --name "lancam-server"
+pm2 start npm --name "lancam-server" -- start
 pm2 save
 
 # Configurar Nginx em /etc/nginx/sites-available/default
