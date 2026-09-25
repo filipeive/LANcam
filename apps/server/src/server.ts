@@ -148,16 +148,21 @@ export async function createServer(config: ServerConfig): Promise<{
     const hostHeader = (req.headers['x-forwarded-host'] || req.headers.host) as string | undefined;
 
     if (hostHeader) {
-      const proto = isHttps
-        ? ((req.headers['x-forwarded-proto'] as string) || (req.secure ? 'https' : 'http'))
-        : 'http';
+      const forwardedProto = req.headers['x-forwarded-proto'] as string | undefined;
+      let proto = forwardedProto || (req.secure ? 'https' : 'http');
+      if (isHttps && !hostHeader.includes('localhost') && !hostHeader.includes('127.0.0.1')) {
+        proto = 'https';
+      }
       return `${proto}://${hostHeader}${pathPrefix}`;
     }
 
     if (req.headers.referer) {
       try {
         const refUrl = new URL(req.headers.referer);
-        const proto = isHttps ? refUrl.protocol : 'http:';
+        let proto = isHttps ? refUrl.protocol : 'http:';
+        if (isHttps && !refUrl.host.includes('localhost') && !refUrl.host.includes('127.0.0.1')) {
+          proto = 'https:';
+        }
         return `${proto}//${refUrl.host}${pathPrefix}`;
       } catch {
         // ignore

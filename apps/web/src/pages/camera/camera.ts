@@ -600,7 +600,35 @@ function showError(message: string): void {
   const panel = document.getElementById('error-panel')!;
   const msgEl = document.getElementById('error-message')!;
   panel.classList.remove('hidden');
-  msgEl.textContent = message;
+
+  const isHttp = window.location.protocol === 'http:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+  const httpsUrl = `https://${window.location.host}${window.location.pathname}${window.location.search}`;
+
+  if (isHttp || message.includes('HTTPS') || message.includes('permissão') || message.includes('permission')) {
+    msgEl.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font-weight:600;font-size:1.05rem;display:flex;align-items:center;gap:8px;color:#ef4444">
+          ${icons.warning(20)} Câmera Bloqueada pelo Navegador
+        </div>
+        <div>${escapeHtml(message)}</div>
+        
+        <div style="background:rgba(0,0,0,0.25);padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1)">
+          <div style="font-weight:600;margin-bottom:8px;color:#38bdf8">💡 Solução Recomendada:</div>
+          <p style="margin-bottom:10px;font-size:0.875rem">Navegadores de telemóveis (Chrome/Safari) exigem uma ligação segura HTTPS para autorizar a câmera.</p>
+          
+          <a href="${httpsUrl}" class="btn btn-primary btn-block" style="text-align:center;text-decoration:none;display:block;padding:10px;font-weight:600">
+            🔒 Abrir em HTTPS (Ativar Câmera)
+          </a>
+          
+          <div style="margin-top:10px;font-size:0.775rem;color:var(--color-text-muted);line-height:1.4">
+            * Se surgir o aviso "Sua conexão não é privada", clique em <b>Avançado</b> → <b>Ir para 146.235.224.99 (não seguro)</b>.
+          </div>
+        </div>
+      </div>
+    `;
+  } else {
+    msgEl.textContent = message;
+  }
 }
 
 function escapeHtml(text: string): string {

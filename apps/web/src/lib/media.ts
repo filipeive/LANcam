@@ -14,16 +14,44 @@ export interface DeviceInfo {
   facingMode: string;
 }
 
+function checkMediaDevicesSupport(): void {
+  if (
+    typeof window !== 'undefined' &&
+    !window.isSecureContext &&
+    window.location.protocol === 'http:' &&
+    window.location.hostname !== 'localhost' &&
+    window.location.hostname !== '127.0.0.1'
+  ) {
+    throw new CameraError(
+      'INSECURE_CONTEXT',
+      'MediaDevices require secure context (HTTPS) on mobile/remote devices.',
+    );
+  }
+
+  if (!navigator?.mediaDevices || !navigator?.mediaDevices?.getUserMedia) {
+    throw new CameraError(
+      'UNSUPPORTED',
+      'MediaDevices API not supported in this browser.',
+    );
+  }
+}
+
 /**
  * Request camera permission and enumerate video devices.
  * Must request getUserMedia first to get device labels.
  */
 export async function enumerateVideoDevices(): Promise<DeviceInfo[]> {
+  checkMediaDevicesSupport();
+
   // First request permission to get device labels
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true });
     stream.getTracks().forEach((t) => t.stop());
   } catch (err) {
+    if (err instanceof CameraError) throw err;
+    if (err instanceof DOMException && err.name === 'NotAllowedError') {
+      throw new CameraError('PERMISSION_DENIED', 'Camera permission denied', err);
+    }
     throw new CameraError('PERMISSION_DENIED', 'Camera permission denied', err);
   }
 
@@ -124,6 +152,8 @@ export async function getCameraStream(
   preset: VideoPreset,
   withAudio = false,
 ): Promise<MediaStream> {
+  checkMediaDevicesSupport();
+
   const targetMax = Math.max(preset.width, preset.height);
   const targetMin = Math.min(preset.width, preset.height);
 
@@ -241,6 +271,7 @@ export async function requestWakeLock(): Promise<WakeLockSentinel | null> {
 
 export type CameraErrorCode =
   | 'PERMISSION_DENIED'
+  | 'INSECURE_CONTEXT'
   | 'NO_CAMERA'
   | 'NOT_FOUND'
   | 'IN_USE'
@@ -259,18 +290,20 @@ export class CameraError extends Error {
 
   getUserMessage(): string {
     switch (this.code) {
+      case 'INSECURE_CONTEXT':
+        return 'A permissão de câmera foi bloqueada pelo navegador por estar a aceder via HTTP. Os navegadores exigem HTTPS ou localhost para autorizar a câmera.';
       case 'PERMISSION_DENIED':
-        return 'Camera permission was denied. Please allow camera access in your browser settings and reload.';
+        return 'O acesso à câmera foi recusado ou bloqueado pelo navegador. Por favor, permita o acesso à câmera nas definições do navegador e recarregue a página.';
       case 'NO_CAMERA':
-        return 'No camera found on this device.';
+        return 'Nenhuma câmera foi encontrada neste dispositivo.';
       case 'NOT_FOUND':
-        return 'The selected camera is no longer available.';
+        return 'A câmera selecionada não está disponível no momento.';
       case 'IN_USE':
-        return 'Camera is being used by another application. Please close other camera apps and try again.';
+        return 'A câmera está a ser utilizada por outra aplicação. Por favor, feche as outras aplicações de câmera.';
       case 'UNSUPPORTED':
-        return 'The requested camera settings are not supported by this device.';
+        return 'A API de câmera não é suportada por este navegador ou ambiente.';
       default:
-        return 'An unexpected error occurred with the camera. Please try again.';
+        return 'Ocorreu um erro inesperado ao aceder à câmera.';
     }
   }
 }

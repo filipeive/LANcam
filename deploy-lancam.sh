@@ -76,8 +76,17 @@ pm2 delete lancam-server 2>/dev/null || true
 pm2 start apps/server/dist/index.js --name "lancam-server"
 pm2 save
 
+# Gerar certificado SSL Auto-Assinado para suporte a HTTPS no Nginx
+echo "🔒 Configurando certificado SSL Auto-Assinado para o Nginx..."
+if [ ! -f /etc/ssl/certs/lancam-selfsigned.crt ]; then
+    sudo openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        -keyout /etc/ssl/private/lancam-selfsigned.key \
+        -out /etc/ssl/certs/lancam-selfsigned.crt \
+        -subj "/CN=146.235.224.99/O=LANCam/C=PT"
+fi
+
 # Configurar Nginx em /etc/nginx/sites-available/default
-echo "🌐 Atualizando /etc/nginx/sites-available/default para incluir LANCam..."
+echo "🌐 Atualizando /etc/nginx/sites-available/default para incluir SSL HTTPS e LANCam..."
 
 python3 - << 'PYEOF'
 import re
@@ -86,13 +95,21 @@ config_path = "/etc/nginx/sites-available/default"
 with open(config_path, "r") as f:
     content = f.read()
 
+# Adicionar escuta de SSL 443 se não estiver presente no bloco server principal
+if "listen 443 ssl" not in content and "ssl_certificate" not in content:
+    content = re.sub(
+        r'(listen\s+80\s+default_server;)',
+        r'\1\n    listen 443 ssl default_server;\n    listen [::]:443 ssl default_server;\n    ssl_certificate /etc/ssl/certs/lancam-selfsigned.crt;\n    ssl_certificate_key /etc/ssl/private/lancam-selfsigned.key;',
+        content,
+        count=1
+    )
+
 # Truncar qualquer fragmento duplicado/inválido inserido após lifechild_infographics
 pattern = r'(location \^\~ /lifechild_infographics/ \{.*?\n\s*\})'
 match = re.search(pattern, content, re.DOTALL)
 if match:
     clean_base = content[:match.end()]
 else:
-    # Se não encontrar o bloco lifechild, limpar LANCAM antigo se existir
     clean_base = re.sub(r'\n?\s*# === LANCAM LOCAL NETWORK CAMERA ===.*', '', content, flags=re.DOTALL).rstrip()
     if clean_base.endswith('}'):
         clean_base = clean_base[:-1].rstrip()
@@ -126,6 +143,7 @@ lancam_block = """
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Prefix /lancam;
     }
 
@@ -136,6 +154,7 @@ lancam_block = """
         proxy_set_header Connection "Upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 """
