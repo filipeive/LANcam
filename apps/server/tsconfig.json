@@ -6,7 +6,7 @@
     "outDir": "./dist",
     "baseUrl": ".",
     "paths": {
-      "@lancam/shared": ["../../packages/shared/dist/index.d.ts"]
+      "@lancam/shared": ["../../packages/shared/src/index.ts"]
     }
   },
   "include": ["src"]
