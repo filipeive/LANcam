@@ -15,7 +15,7 @@
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:desktop": "npm run dev --workspace=apps/desktop",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:web\"",
-    "build": "npm run build --workspaces",
+    "build": "npm run build --workspace=packages/shared && npm run build --workspace=apps/server && npm run build --workspace=apps/web && npm run build --workspace=apps/desktop",
     "build:web": "npm run build --workspace=apps/web",
     "build:server": "npm run build --workspace=apps/server",
     "build:desktop": "npm run build --workspace=apps/desktop",
