@@ -82,8 +82,9 @@ config_path = "/etc/nginx/sites-available/default"
 with open(config_path, "r") as f:
     content = f.read()
 
-# Remover bloco antigo do lancam se existir para evitar duplicidade
+# Remover blocos antigos do lancam se existirem
 content = re.sub(r'\n?\s*# === LANCAM LOCAL NETWORK CAMERA ===.*?(?=\n\s*(#|\}|$))', '', content, flags=re.DOTALL)
+content = content.rstrip()
 
 lancam_block = """
     # === LANCAM LOCAL NETWORK CAMERA ===
@@ -125,12 +126,15 @@ lancam_block = """
     }
 """
 
-# Inserir bloco antes do último fecha chaves do bloco server
-last_brace = content.rfind("}")
-if last_brace != -1:
-    new_content = content[:last_brace] + lancam_block + "\n" + content[last_brace:]
-    with open("/tmp/nginx_default_temp", "w") as f:
-        f.write(new_content)
+if content.endswith('}'):
+    content = content[:-1].rstrip() + "\n" + lancam_block + "\n}\n"
+else:
+    last_brace = content.rfind("}")
+    if last_brace != -1:
+        content = content[:last_brace] + lancam_block + "\n" + content[last_brace:]
+
+with open("/tmp/nginx_default_temp", "w") as f:
+    f.write(content)
 PYEOF
 
 sudo cp /tmp/nginx_default_temp /etc/nginx/sites-available/default
