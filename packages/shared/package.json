@@ -9,7 +9,7 @@
     ".": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist tsconfig.tsbuildinfo && tsc",
     "typecheck": "tsc --noEmit",
     "test": "npx tsx --test src/__tests__/*.test.ts"
   }

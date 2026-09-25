@@ -5,6 +5,7 @@ node_modules/
 dist/
 dist-package/
 .vite/
+*.tsbuildinfo
 
 # Certificates (generated locally)
 certs/
