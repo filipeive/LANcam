@@ -55,7 +55,7 @@ echo "📦 Instalando dependências npm..."
 npm install
 
 echo "🛠️ Compilando aplicação monorepo..."
-npm run build
+VITE_BASE=/lancam/ npm run build
 
 # Criar ficheiro .env de produção se não existir
 if [ ! -f .env ]; then
@@ -69,7 +69,7 @@ if ! command -v pm2 &> /dev/null; then
 fi
 
 pm2 delete lancam-server 2>/dev/null || true
-pm2 start npm --name "lancam-server" -- start
+pm2 start apps/server/dist/index.js --name "lancam-server"
 pm2 save
 
 # Configurar Nginx em /etc/nginx/sites-available/default
@@ -87,10 +87,24 @@ content = re.sub(r'\n?\s*# === LANCAM LOCAL NETWORK CAMERA ===.*?(?=\n\s*(#|\}|$
 
 lancam_block = """
     # === LANCAM LOCAL NETWORK CAMERA ===
-    location /lancam {
-        alias /var/www/html/lancam/apps/web/dist;
+    location = /lancam {
+        return 301 /lancam/;
+    }
+
+    location = /lancam/index.html {
+        alias /var/www/html/lancam/apps/web/dist/index.html;
+    }
+
+    location ^~ /lancam/assets/ {
+        alias /var/www/html/lancam/apps/web/dist/assets/;
+        access_log off;
+        expires 7d;
+    }
+
+    location ^~ /lancam/ {
+        alias /var/www/html/lancam/apps/web/dist/;
         index index.html;
-        try_files $uri $uri/ /lancam/index.html;
+        try_files $request_filename $request_filename/ /lancam/index.html;
     }
 
     location /api/ {

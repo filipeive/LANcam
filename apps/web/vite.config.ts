@@ -3,7 +3,7 @@ import { resolve } from 'path';
 
 export default defineConfig({
   root: '.',
-  base: './',
+  base: process.env.VITE_BASE || './',
   build: {
     outDir: 'dist',
     emptyOutDir: true,
