@@ -98,8 +98,8 @@ with open(config_path, "r") as f:
 # Adicionar escuta de SSL 443 se não estiver presente no bloco server principal
 if "listen 443 ssl" not in content and "ssl_certificate" not in content:
     content = re.sub(
-        r'(listen\s+80\s+default_server;)',
-        r'\1\n    listen 443 ssl default_server;\n    listen [::]:443 ssl default_server;\n    ssl_certificate /etc/ssl/certs/lancam-selfsigned.crt;\n    ssl_certificate_key /etc/ssl/private/lancam-selfsigned.key;',
+        r'(listen\s+80(?:\s+default_server)?;)',
+        r'\1\n    listen 443 ssl;\n    listen [::]:443 ssl;\n    ssl_certificate /etc/ssl/certs/lancam-selfsigned.crt;\n    ssl_certificate_key /etc/ssl/private/lancam-selfsigned.key;',
         content,
         count=1
     )
