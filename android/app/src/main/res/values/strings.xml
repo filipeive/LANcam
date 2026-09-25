@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">LANCam</string>
+    <string name="title_activity_main">LANCam</string>
+    <string name="package_name">com.filipeive.lancam</string>
+    <string name="custom_url_scheme">com.filipeive.lancam</string>
+</resources>

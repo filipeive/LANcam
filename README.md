@@ -88,25 +88,45 @@ npm run setup:certs
 |---|---|---|
 | 🐧 **Linux** (`.AppImage` & `.deb`) | `npm run package:linux` | `apps/desktop/dist-package/LANCam-0.1.0-linux.AppImage`<br>`apps/desktop/dist-package/LANCam-0.1.0-linux.deb` |
 | 🪟 **Windows** (`.exe` NSIS & Portable) | `npm run package:win` | `apps/desktop/dist-package/LANCam-0.1.0-win.exe` |
-| 📱 **Android** (PWA Bundle / APK guide) | `npm run package:android` | `dist-package/android/lancam-android-web-pwa.zip` |
-| 🚀 **All Platforms** | `npm run package:all` | Packages Linux, Windows, and Android all at once |
+| 📱 **Android** (PWA Bundle) | `npm run package:android` | `dist-package/android/lancam-android-web-pwa.zip` |
+| 📱 **Native Mobile** (Android & iOS) | `npm run package:mobile:native` | Native Capacitor projects in `android/` and `ios/` |
+| 🚀 **All Platforms** | `npm run package:all` | Packages Linux, Windows, Android, and iOS all at once |
 
 Detailed instructions are available in [docs/BUILDING_INSTALLERS.md](docs/BUILDING_INSTALLERS.md).
 
 ---
 
-## 🚀 Production Deployment
+## 📡 mDNS ZeroConf Local Discovery
 
-Deploy LANCam automatically to your production server (e.g. Oracle Cloud VPS):
+LANCam includes an embedded mDNS responder (`bonjour-service`). When running on a local network, devices can connect using the local hostname:
 
-```bash
-./deploy-lancam.sh
+```text
+http://lancam.local:3478
 ```
 
-This script handles:
-- Code pull & workspace compilation
-- PM2 process daemon management
-- Nginx reverse proxy & WebSocket (`/ws`) configuration
+No IP address lookup is required for OBS Studio or local smartphone browsers on supported networks.
+
+---
+
+## 📱 Mobile App Releases (Play Store & App Store)
+
+To generate signed native builds for store releases:
+
+1. **Android (Google Play Store)**:
+   ```bash
+   npm run package:mobile:native
+   npx cap open android
+   ```
+   - Opens in **Android Studio**.
+   - Select **Build → Generate Signed Bundle / APK** (`.aab` / `.apk`) for Google Play Console.
+
+2. **iOS (Apple App Store)**:
+   ```bash
+   npm run package:mobile:native
+   npx cap open ios
+   ```
+   - Opens in **Xcode** on macOS.
+   - Select **Product → Archive → Distribute App** for App Store Connect / TestFlight.
 
 ---
 
@@ -117,8 +137,8 @@ This script handles:
 - [x] **Phase 3**: Cross-platform Desktop App & Native Installers (Linux AppImage/DEB, Windows NSIS EXE, Android PWA)
 - [x] **Phase 4**: Production Cloud Deployment (Automated Oracle Cloud Nginx + PM2 script)
 - [x] **Phase 5**: QR Code Join & Low-latency WebRTC Optimization
-- [ ] **Phase 6**: mDNS Local Discovery (`lancam.local`)
-- [ ] **Phase 7**: Native Mobile App Releases (Google Play Store & Apple App Store)
+- [x] **Phase 6**: mDNS Local Discovery (`lancam.local`)
+- [x] **Phase 7**: Native Mobile App Releases (Google Play Store & Apple App Store)
 
 ---
 

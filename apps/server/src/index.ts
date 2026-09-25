@@ -9,10 +9,11 @@ import { setLogLevel, createLogger } from './logger.js';
 import { createServer, getLocalIPs } from './server.js';
 import { SessionManager } from './session.js';
 import { SignalingServer } from './signaling.js';
+import { startMDNSDiscovery, type MDNSServiceController } from './mdns.js';
 import { APP_NAME, APP_VERSION } from '@lancam/shared';
 import fs from 'fs';
 
-export { loadConfig, setLogLevel, createLogger, createServer, getLocalIPs, SessionManager, SignalingServer };
+export { loadConfig, setLogLevel, createLogger, createServer, getLocalIPs, SessionManager, SignalingServer, startMDNSDiscovery };
 
 const config = loadConfig();
 setLogLevel(config.logLevel);
@@ -27,11 +28,15 @@ async function main(): Promise<void> {
   });
 
   const { server, httpServer, signaling, sessionManager } = await createServer(config);
+  let mdnsController: MDNSServiceController | null = null;
 
   // Start listening on primary server (HTTPS)
   server.listen(config.port, config.host, () => {
     const localIPs = getLocalIPs();
     const hasCerts = fs.existsSync(config.certPath) && fs.existsSync(config.keyPath);
+
+    // Start mDNS ZeroConf Local Network Discovery (lancam.local)
+    mdnsController = startMDNSDiscovery(config.port, 'lancam');
 
     console.log('');
     console.log(`  ╔══════════════════════════════════════════════╗`);
@@ -60,10 +65,14 @@ async function main(): Promise<void> {
     }
 
     console.log(`  ║                                              ║`);
+    console.log(`  ║   mDNS ZeroConf Local Hostname:              ║`);
+    console.log(`  ║     http://lancam.local:${String(config.port).padEnd(20)}  ║`);
+    console.log(`  ║                                              ║`);
     console.log(`  ║   ✓  HTTPS Enabled (Port ${config.port})            ║`);
     if (httpServer) {
       console.log(`  ║   ✓  HTTP Enabled for OBS (Port ${config.httpPort})     ║`);
     }
+    console.log(`  ║   ✓  mDNS Discovery Active (lancam.local)    ║`);
     console.log(`  ║                                              ║`);
     console.log(`  ╚══════════════════════════════════════════════╝`);
     console.log('');
@@ -84,6 +93,9 @@ async function main(): Promise<void> {
   const shutdown = (signal: string) => {
     log.info(`Received ${signal}, shutting down...`);
     clearInterval(cleanupInterval);
+    if (mdnsController) {
+      mdnsController.stop();
+    }
     signaling.shutdown();
     server.close(() => {
       if (httpServer) {
