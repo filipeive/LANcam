@@ -4,10 +4,9 @@
     "module": "ES2022",
     "moduleResolution": "bundler",
     "outDir": "./dist",
-    "rootDir": "./src",
     "baseUrl": ".",
     "paths": {
-      "@lancam/shared": ["../../packages/shared/dist/index.d.ts", "../../packages/shared/src/index.ts"]
+      "@lancam/shared": ["../../packages/shared/dist/index.d.ts"]
     }
   },
   "include": ["src"]
