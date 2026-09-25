@@ -88,14 +88,16 @@ export const CAMERA_NAME_MAX_LENGTH = 50;
 
 export const CAMERA_ID_PREFIX = 'CAM-';
 
-// ─── ICE Configuration ────────────────────────────────────────
-
 /**
- * LAN-only ICE configuration.
- * Empty iceServers forces browser to gather only host candidates,
- * keeping all traffic on the local network.
+ * WebRTC ICE configuration with STUN servers for local network and WAN connectivity.
  */
 export const LAN_ICE_CONFIG: RtcConfiguration = {
-  iceServers: [],
-  iceCandidatePoolSize: 0,
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+  ],
+  iceCandidatePoolSize: 10,
 };

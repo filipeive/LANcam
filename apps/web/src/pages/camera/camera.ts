@@ -203,7 +203,10 @@ async function joinSession(): Promise<void> {
     state.sessionName = data.sessionName;
     state.cameraId = data.cameraId;
     state.sessionToken = data.sessionToken;
-    state.wsUrl = data.wsUrl;
+
+    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const relativeWsUrl = `${wsProto}//${window.location.host}/ws`;
+    state.wsUrl = data.wsUrl && !data.wsUrl.includes(':3478') ? data.wsUrl : relativeWsUrl;
 
     updateSessionInfo(`Session: ${data.sessionName}`);
 

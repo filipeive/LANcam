@@ -256,9 +256,14 @@ export async function createServer(config: ServerConfig): Promise<{
       return;
     }
 
+    const hostHeader = (req.headers['x-forwarded-host'] || req.headers.host) as string | undefined;
+    const isHttps = (req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http')) === 'https';
+    const proto = isHttps ? 'wss' : 'ws';
+    const wsUrl = hostHeader ? `${proto}://${hostHeader}/ws` : `wss://${config.publicHost || primaryIP}:${config.port}/ws`;
+
     res.json({
       ...result,
-      wsUrl: `wss://${config.publicHost || primaryIP}:${config.port}/ws`,
+      wsUrl,
     });
   });
 
