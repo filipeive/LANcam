@@ -1,0 +1,228 @@
+/**
+ * LANCam Server — HTTP Server & API Routes
+ *
+ * HTTPS server serving:
+ * - Static frontend files (Vite build output)
+ * - REST API for session management
+ * - WebSocket upgrade for signaling
+ * - Health check endpoint
+ */
+import https from 'https';
+import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import express from 'express';
+import QRCode from 'qrcode';
+import { createLogger } from './logger.js';
+import { SessionManager } from './session.js';
+import { SignalingServer } from './signaling.js';
+import { APP_NAME, APP_VERSION } from '@lancam/shared';
+import { networkInterfaces } from 'os';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const log = createLogger('server');
+export function getLocalIPs() {
+    const interfaces = networkInterfaces();
+    const ips = [];
+    for (const iface of Object.values(interfaces)) {
+        if (!iface)
+            continue;
+        for (const addr of iface) {
+            if (addr.family === 'IPv4' && !addr.internal) {
+                ips.push(addr.address);
+            }
+        }
+    }
+    return ips;
+}
+export async function createServer(config) {
+    const app = express();
+    const sessionManager = new SessionManager();
+    // ─── Middleware ─────────────────────────────────────────────
+    app.use(express.json());
+    app.use((req, res, next) => {
+        res.header('Access-Control-Allow-Origin', config.corsOrigin);
+        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        if (req.method === 'OPTIONS') {
+            res.sendStatus(204);
+            return;
+        }
+        next();
+    });
+    // ─── API Routes ────────────────────────────────────────────
+    const localIPs = getLocalIPs();
+    const primaryIP = localIPs[0] || '127.0.0.1';
+    const baseUrl = `https://${config.publicHost || primaryIP}:${config.port}`;
+    const httpBaseUrl = `http://${config.publicHost || primaryIP}:${config.httpPort}`;
+    // Health check
+    app.get('/health', (_req, res) => {
+        const stats = sessionManager.getStats();
+        const health = {
+            status: 'ok',
+            signaling: true,
+            uptime: process.uptime(),
+            activeSessions: stats.activeSessions,
+            connectedCameras: stats.totalCameras,
+            version: APP_VERSION,
+        };
+        res.json(health);
+    });
+    // Get server info (for client bootstrapping)
+    app.get('/api/info', (_req, res) => {
+        res.json({
+            name: APP_NAME,
+            version: APP_VERSION,
+            wsUrl: `wss://${config.publicHost || primaryIP}:${config.port}/ws`,
+            wsHttpUrl: `ws://${config.publicHost || primaryIP}:${config.httpPort}/ws`,
+            localIPs,
+        });
+    });
+    // Create session
+    app.post('/api/sessions', async (req, res) => {
+        try {
+            const body = req.body;
+            if (!body.name || typeof body.name !== 'string') {
+                res.status(400).json({ error: 'Session name is required' });
+                return;
+            }
+            const { sessionId, joinCode, joinToken, dashboardToken } = sessionManager.createSession(body.name);
+            const joinUrl = `${baseUrl}/join/${joinCode}`;
+            // Generate QR code as data URL
+            const qrCodeDataUrl = await QRCode.toDataURL(joinUrl, {
+                width: 300,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#ffffff',
+                },
+                errorCorrectionLevel: 'M',
+            });
+            const response = {
+                sessionId,
+                joinToken,
+                joinUrl,
+                qrCodeDataUrl,
+                dashboardToken,
+                joinCode,
+            };
+            res.status(201).json(response);
+        }
+        catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            log.error('Failed to create session', { error: message });
+            res.status(500).json({ error: message });
+        }
+    });
+    // Get session details (for dashboard)
+    app.get('/api/sessions/:sessionId', (req, res) => {
+        const session = sessionManager.getSession(req.params.sessionId);
+        if (!session) {
+            res.status(404).json({ error: 'Session not found' });
+            return;
+        }
+        // Build OBS URLs for each camera (HTTP by default for OBS CEF SSL compatibility, plus HTTPS option)
+        const obsUrls = {};
+        const obsHttpsUrls = {};
+        for (const camera of session.cameras) {
+            const viewerToken = sessionManager.createViewerToken(session.sessionId, camera.cameraId);
+            if (viewerToken) {
+                obsUrls[camera.cameraId] =
+                    `${httpBaseUrl}/camera/${camera.cameraId}/view?token=${viewerToken}&session=${session.sessionId}`;
+                obsHttpsUrls[camera.cameraId] =
+                    `${baseUrl}/camera/${camera.cameraId}/view?token=${viewerToken}&session=${session.sessionId}`;
+            }
+        }
+        res.json({ session, obsUrls, obsHttpsUrls });
+    });
+    // List active sessions
+    app.get('/api/sessions', (_req, res) => {
+        const sessions = sessionManager.getActiveSessions();
+        res.json({ sessions });
+    });
+    // Join session (returns camera page data)
+    app.get('/api/join/:joinCode', (req, res) => {
+        const result = sessionManager.joinSession(req.params.joinCode);
+        if (!result) {
+            res.status(404).json({ error: 'Invalid or expired join code' });
+            return;
+        }
+        res.json({
+            ...result,
+            wsUrl: `wss://${config.publicHost || primaryIP}:${config.port}/ws`,
+        });
+    });
+    // Create viewer token for a camera
+    app.post('/api/sessions/:sessionId/cameras/:cameraId/viewer-token', (req, res) => {
+        const token = sessionManager.createViewerToken(req.params.sessionId, req.params.cameraId);
+        if (!token) {
+            res.status(404).json({ error: 'Session or camera not found' });
+            return;
+        }
+        const viewUrl = `${httpBaseUrl}/camera/${req.params.cameraId}/view?token=${token}&session=${req.params.sessionId}`;
+        const viewHttpsUrl = `${baseUrl}/camera/${req.params.cameraId}/view?token=${token}&session=${req.params.sessionId}`;
+        res.json({ token, viewUrl, viewHttpsUrl });
+    });
+    // ─── Static File Serving ───────────────────────────────────
+    // Serve the Vite build output
+    const webDistPath = path.resolve(__dirname, '../../web/dist');
+    const webPublicPath = path.resolve(__dirname, '../../web/public');
+    if (fs.existsSync(webDistPath)) {
+        app.use(express.static(webDistPath));
+    }
+    else if (fs.existsSync(webPublicPath)) {
+        app.use(express.static(webPublicPath));
+    }
+    // SPA fallback — serve index.html for all unmatched routes
+    app.get('*', (req, res) => {
+        if (req.path.startsWith('/api/') || req.path.startsWith('/ws')) {
+            res.status(404).json({ error: 'Not found' });
+            return;
+        }
+        const indexPath = fs.existsSync(webDistPath)
+            ? path.join(webDistPath, 'index.html')
+            : path.join(webPublicPath, 'index.html');
+        if (fs.existsSync(indexPath)) {
+            res.sendFile(indexPath);
+        }
+        else {
+            res.status(200).send(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>${APP_NAME}</title></head>
+        <body>
+          <h1>${APP_NAME} Server v${APP_VERSION}</h1>
+          <p>Server is running.</p>
+        </body>
+        </html>
+      `);
+        }
+    });
+    // ─── Create HTTPS & HTTP Servers ──────────────────────────
+    let server;
+    let httpServer;
+    const hasCerts = fs.existsSync(config.certPath) && fs.existsSync(config.keyPath);
+    if (hasCerts) {
+        const sslOptions = {
+            cert: fs.readFileSync(config.certPath),
+            key: fs.readFileSync(config.keyPath),
+        };
+        server = https.createServer(sslOptions, app);
+        httpServer = http.createServer(app);
+        log.info('HTTPS server created for mobile camera & HTTP server created for OBS Browser Source', {
+            httpsPort: config.port,
+            httpPort: config.httpPort,
+        });
+    }
+    else {
+        log.warn('TLS certificates not found — starting HTTP server. ' +
+            'Camera access will NOT work on mobile browsers. ' +
+            'Run "npm run setup:certs" to generate certificates.');
+        server = http.createServer(app);
+    }
+    // ─── WebSocket Signaling ───────────────────────────────────
+    const serversToBind = httpServer ? [server, httpServer] : [server];
+    const signaling = new SignalingServer(serversToBind, sessionManager);
+    return { server, httpServer, signaling, sessionManager };
+}
+//# sourceMappingURL=server.js.map

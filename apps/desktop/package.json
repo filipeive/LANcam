@@ -1,0 +1,27 @@
+{
+  "name": "@lancam/desktop",
+  "version": "0.1.0",
+  "description": "LANCam Native Desktop Application — Local Network Camera for OBS Studio",
+  "author": "Filipe dos Santos <filipe@lancam.local>",
+  "homepage": "https://github.com/filipe/lancam",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "tsc && electron .",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "package:linux": "electron-builder --linux AppImage deb",
+    "package:win": "electron-builder --win nsis portable"
+  },
+  "dependencies": {
+    "@lancam/shared": "*",
+    "@lancam/server": "*",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "electron": "31.3.0",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0"
+  }
+}

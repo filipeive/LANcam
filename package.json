@@ -1,0 +1,38 @@
+{
+  "name": "lancam",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LANCam — Local Network Camera. Turn your smartphone into a low-latency camera for OBS Studio over LAN.",
+  "author": "Filipe dos Santos",
+  "workspaces": [
+    "packages/shared",
+    "apps/server",
+    "apps/web",
+    "apps/desktop"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/server",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:desktop": "npm run dev --workspace=apps/desktop",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:web\"",
+    "build": "npm run build --workspaces",
+    "build:web": "npm run build --workspace=apps/web",
+    "build:server": "npm run build --workspace=apps/server",
+    "build:desktop": "npm run build --workspace=apps/desktop",
+    "package:linux": "npm run build && npm run package:linux --workspace=apps/desktop",
+    "package:win": "npm run build && npm run package:win --workspace=apps/desktop",
+    "package:android": "bash scripts/package-android.sh",
+    "package:all": "npm run package:linux && npm run package:win && npm run package:android",
+    "package:desktop:linux": "npm run package:linux --workspace=apps/desktop",
+    "package:desktop:win": "npm run package:win --workspace=apps/desktop",
+    "start": "npm run start --workspace=apps/server",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint . --ext .ts",
+    "setup:certs": "bash scripts/setup-certs.sh",
+    "setup": "bash scripts/install.sh"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT"
+}

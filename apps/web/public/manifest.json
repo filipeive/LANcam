@@ -1,0 +1,18 @@
+{
+  "name": "LANCam Local Camera",
+  "short_name": "LANCam",
+  "description": "Turn your smartphone into a low-latency camera for OBS Studio over LAN",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0e17",
+  "theme_color": "#0a0e17",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

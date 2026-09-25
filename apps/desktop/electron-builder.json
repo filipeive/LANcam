@@ -1,0 +1,49 @@
+{
+  "appId": "com.lancam.desktop",
+  "productName": "LANCam",
+  "executableName": "lancam",
+  "artifactName": "${productName}-${version}-${os}.${ext}",
+  "electronVersion": "31.3.0",
+  "npmRebuild": false,
+  "directories": {
+    "output": "dist-package",
+    "buildResources": "build"
+  },
+  "files": [
+    "dist/**/*",
+    "build/**/*",
+    "package.json",
+    "../../node_modules/**/*",
+    {
+      "from": "../../apps/server",
+      "to": "node_modules/@lancam/server",
+      "filter": ["dist/**/*", "package.json"]
+    },
+    {
+      "from": "../../packages/shared",
+      "to": "node_modules/@lancam/shared",
+      "filter": ["dist/**/*", "package.json"]
+    },
+    {
+      "from": "../../apps/web/dist",
+      "to": "apps/web/dist",
+      "filter": ["**/*"]
+    }
+  ],
+  "linux": {
+    "target": ["AppImage", "deb"],
+    "category": "Video",
+    "icon": "build/icon.png",
+    "maintainer": "Filipe dos Santos <filipedomingos198@gmail.com>"
+  },
+  "win": {
+    "target": ["nsis", "portable"],
+    "icon": "build/icon.png"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true
+  }
+}
