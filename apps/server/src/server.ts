@@ -152,6 +152,11 @@ export async function createServer(config: ServerConfig): Promise<{
       let proto = forwardedProto || (req.secure ? 'https' : (isHttps ? 'https' : 'http'));
 
       let formattedHost = hostHeader;
+      // Replace localhost/127.0.0.1 with primary LAN IP for smartphone QR codes
+      if (formattedHost.startsWith('localhost') || formattedHost.startsWith('127.0.0.1')) {
+        formattedHost = formattedHost.replace(/^(localhost|127\.0\.0\.1)/, primaryIP);
+      }
+
       // If generating HTTPS URL, replace HTTP port (e.g. :3479) with HTTPS port (e.g. :3478)
       if (proto === 'https' && formattedHost.includes(`:${config.httpPort}`)) {
         formattedHost = formattedHost.replace(`:${config.httpPort}`, `:${config.port}`);
@@ -167,6 +172,9 @@ export async function createServer(config: ServerConfig): Promise<{
         const refUrl = new URL(req.headers.referer);
         let proto = isHttps ? refUrl.protocol : 'http:';
         let host = refUrl.host;
+        if (host.startsWith('localhost') || host.startsWith('127.0.0.1')) {
+          host = host.replace(/^(localhost|127\.0\.0\.1)/, primaryIP);
+        }
         if (isHttps && host.includes(`:${config.httpPort}`)) {
           host = host.replace(`:${config.httpPort}`, `:${config.port}`);
           proto = 'https:';
