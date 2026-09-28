@@ -416,6 +416,20 @@ export class SignalingServer {
     return this.peers.size;
   }
 
+  /** Remove a camera peer from session and notify all clients */
+  removeCameraPeer(sessionId: string, cameraId: string): void {
+    const peer = this.peers.get(cameraId);
+    if (peer) {
+      if (peer.ws.readyState === WebSocket.OPEN) {
+        peer.ws.close(1000, 'Camera removed by host');
+      }
+      this.peers.delete(cameraId);
+      this.wsToPeer.delete(peer.ws);
+    }
+    this.sessionManager.removeCamera(sessionId, cameraId);
+    this.broadcastCameraListUpdate(sessionId);
+  }
+
   /** Shutdown gracefully */
   shutdown(): void {
     if (this.pingInterval) {

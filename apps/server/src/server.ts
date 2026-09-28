@@ -54,6 +54,7 @@ export async function createServer(config: ServerConfig): Promise<{
 }> {
   const app = express();
   const sessionManager = new SessionManager();
+  let signaling: SignalingServer;
 
   // ─── Middleware ─────────────────────────────────────────────
 
@@ -276,6 +277,22 @@ export async function createServer(config: ServerConfig): Promise<{
     res.json({ success: true, message: 'Session deleted successfully' });
   });
 
+  // Remove/Disconnect a specific camera from session
+  app.delete('/api/sessions/:sessionId/cameras/:cameraId', (req, res) => {
+    const { sessionId, cameraId } = req.params;
+    const session = sessionManager.getSession(sessionId);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    if (signaling) {
+      signaling.removeCameraPeer(sessionId, cameraId);
+    } else {
+      sessionManager.removeCamera(sessionId, cameraId);
+    }
+    res.json({ success: true, message: 'Camera removed successfully' });
+  });
+
   // Join session (returns camera page data)
   app.get('/api/join/:joinCode', (req, res) => {
     const result = sessionManager.joinSession(req.params.joinCode);
@@ -415,7 +432,7 @@ export async function createServer(config: ServerConfig): Promise<{
   // ─── WebSocket Signaling ───────────────────────────────────
 
   const serversToBind = httpServer ? [server, httpServer] : [server];
-  const signaling = new SignalingServer(serversToBind, sessionManager);
+  signaling = new SignalingServer(serversToBind, sessionManager);
 
   return { server, httpServer, signaling, sessionManager };
 }

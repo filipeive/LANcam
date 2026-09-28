@@ -395,7 +395,6 @@ function connectSignaling(): void {
   state.signaling.on('camera-list-update', (msg) => {
     const { cameras } = msg as { cameras: CameraInfo[] };
     state.cameras = cameras;
-    updateCameraList();
     refreshObsUrls();
   });
 
@@ -416,6 +415,11 @@ function connectSignaling(): void {
       },
     });
   }
+
+  // Fallback periodic refresh every 3 seconds for dynamic real-time updates
+  setInterval(() => {
+    refreshObsUrls();
+  }, 3000);
 }
 
 async function refreshObsUrls(): Promise<void> {
@@ -423,8 +427,10 @@ async function refreshObsUrls(): Promise<void> {
     const res = await fetch(`/api/sessions/${state.sessionId}`);
     if (res.ok) {
       const data = await res.json();
+      state.cameras = data.session.cameras || [];
       state.obsUrls = data.obsUrls || {};
       state.obsHttpsUrls = data.obsHttpsUrls || {};
+      updateCameraList();
     }
   } catch {
     // Non-critical
@@ -464,10 +470,13 @@ function updateCameraList(): void {
     }
   });
 
+  const basePrefix = getBasePrefix();
+
   realCameras.forEach((camera) => {
     const statusClass = camera.status === 'live' ? 'live' : camera.status === 'ready' ? 'ready' : 'offline';
-    const rawObsUrl = state.obsUrls[camera.cameraId] || '';
-    const relativePreviewUrl = rawObsUrl ? rawObsUrl.replace(/^https?:\/\/[^/]+/, '') : '';
+    const fallbackUrl = `${basePrefix}/camera/${camera.cameraId}/view?session=${state.sessionId}`;
+    const rawObsUrl = state.obsUrls[camera.cameraId] || fallbackUrl;
+    const relativePreviewUrl = rawObsUrl.startsWith('http') ? rawObsUrl.replace(/^https?:\/\/[^/]+/, '') : rawObsUrl;
 
     let card = listEl.querySelector<HTMLDivElement>(`.camera-card[data-camera-id="${camera.cameraId}"]`);
 
@@ -480,7 +489,7 @@ function updateCameraList(): void {
     }
 
     const iframe = card.querySelector<HTMLIFrameElement>(`#preview-frame-${camera.cameraId}`);
-    if (!iframe && relativePreviewUrl) {
+    if (!iframe) {
       card.innerHTML = `
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
@@ -491,6 +500,9 @@ function updateCameraList(): void {
             <span class="badge badge--${statusClass}" id="badge-${camera.cameraId}">${camera.status.toUpperCase()}</span>
             <button class="btn btn-xs btn-outline" id="open-viewer-${camera.cameraId}" title="Abrir Visualizador Em Ecrã Inteiro">
               ${icons.externalLink(14)} Visualizador
+            </button>
+            <button class="btn btn-xs btn-outline-danger" id="remove-camera-${camera.cameraId}" title="Desconectar Câmera" style="border-color:rgba(239,68,68,0.4);color:#ef4444;background:rgba(239,68,68,0.1)">
+              ${icons.trash(14)} Desconectar
             </button>
           </div>
         </div>
@@ -556,7 +568,12 @@ function updateCameraList(): void {
 
       const buildUrl = () => {
         const baseUrlToUse = useHttps ? (state.obsHttpsUrls[camera.cameraId] || rawObsUrl) : rawObsUrl;
-        const urlObj = new URL(baseUrlToUse, window.location.origin);
+        let urlObj: URL;
+        try {
+          urlObj = new URL(baseUrlToUse, window.location.origin);
+        } catch {
+          urlObj = new URL(window.location.origin + (baseUrlToUse.startsWith('/') ? baseUrlToUse : `/${baseUrlToUse}`));
+        }
 
         const chkAudio = card.querySelector<HTMLInputElement>(`#opt-audio-${camera.cameraId}`);
         const chkMirror = card.querySelector<HTMLInputElement>(`#opt-mirror-${camera.cameraId}`);
@@ -599,6 +616,21 @@ function updateCameraList(): void {
       const openBtn = card.querySelector(`#open-viewer-${camera.cameraId}`);
       openBtn?.addEventListener('click', () => {
         window.open(buildUrl(), '_blank');
+      });
+
+      const removeBtn = card.querySelector(`#remove-camera-${camera.cameraId}`);
+      removeBtn?.addEventListener('click', async () => {
+        if (confirm(`Pretende desconectar a câmera "${camera.cameraName}"?`)) {
+          try {
+            await fetch(`/api/sessions/${state.sessionId}/cameras/${camera.cameraId}`, {
+              method: 'DELETE',
+            });
+            card?.remove();
+            refreshObsUrls();
+          } catch {
+            alert('Erro ao eliminar a câmera.');
+          }
+        }
       });
 
       const protoBtn = card.querySelector(`#toggle-protocol-${camera.cameraId}`);
