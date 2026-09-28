@@ -314,10 +314,16 @@ export async function createServer(config: ServerConfig): Promise<{
     app.use(express.static(webPublicPath));
   }
 
-  // SPA fallback — serve index.html for all unmatched routes
+  // SPA fallback — serve index.html for all unmatched routes (excluding API, WS, and static file extensions)
   app.get('*', (req, res) => {
     if (req.path.startsWith('/api/') || req.path.startsWith('/ws')) {
       res.status(404).json({ error: 'Not found' });
+      return;
+    }
+
+    // Do not fall back to index.html for missing static assets (.js, .css, .ts, images, fonts)
+    if (/\.(js|ts|css|png|jpg|jpeg|gif|svg|ico|json|map|woff2?|ttf|eot)$/i.test(req.path)) {
+      res.status(404).send('Asset not found');
       return;
     }
 
