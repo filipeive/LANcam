@@ -264,6 +264,18 @@ export async function createServer(config: ServerConfig): Promise<{
     res.json({ sessions });
   });
 
+  // Delete/End session
+  app.delete('/api/sessions/:sessionId', (req, res) => {
+    const session = sessionManager.getSession(req.params.sessionId);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    sessionManager.endSession(req.params.sessionId);
+    res.json({ success: true, message: 'Session deleted successfully' });
+  });
+
   // Join session (returns camera page data)
   app.get('/api/join/:joinCode', (req, res) => {
     const result = sessionManager.joinSession(req.params.joinCode);
