@@ -138,7 +138,7 @@ lancam_block = """
     }
 
     location /api/ {
-        proxy_pass http://127.0.0.1:3478;
+        proxy_pass http://127.0.0.1:3479;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -148,7 +148,7 @@ lancam_block = """
     }
 
     location /ws {
-        proxy_pass http://127.0.0.1:3478;
+        proxy_pass http://127.0.0.1:3479;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "Upgrade";
