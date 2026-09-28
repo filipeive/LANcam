@@ -7,6 +7,11 @@
 
 import './styles/global.css';
 
+import { initHomePage } from './pages/home/home.js';
+import { initCameraPage } from './pages/camera/camera.js';
+import { initViewerPage } from './pages/viewer/viewer.js';
+import { initDashboardPage } from './pages/dashboard/dashboard.js';
+
 export function getBasePrefix(): string {
   const pathname = window.location.pathname;
   if (pathname.startsWith('/lancam')) {
@@ -36,7 +41,6 @@ async function route(): Promise<void> {
     if (path.startsWith('/join/')) {
       // Camera join page — extract join code
       const joinCode = path.split('/join/')[1]?.split('?')[0] || '';
-      const { initCameraPage } = await import('./pages/camera/camera.js');
       await initCameraPage(app, joinCode);
     } else if (path.startsWith('/camera/') && path.includes('/view')) {
       // OBS Viewer endpoint
@@ -45,7 +49,6 @@ async function route(): Promise<void> {
       const params = new URLSearchParams(window.location.search);
       const token = params.get('token') || '';
       const sessionId = params.get('session') || '';
-      const { initViewerPage } = await import('./pages/viewer/viewer.js');
       await initViewerPage(app, cameraId, token, sessionId);
     } else if (path === '/dashboard' || path.startsWith('/dashboard/')) {
       // Dashboard
@@ -53,11 +56,9 @@ async function route(): Promise<void> {
       const sessionId = parts?.[1] || '';
       const params = new URLSearchParams(window.location.search);
       const token = params.get('token') || '';
-      const { initDashboardPage } = await import('./pages/dashboard/dashboard.js');
       await initDashboardPage(app, sessionId, token);
     } else {
       // Home / Landing page
-      const { initHomePage } = await import('./pages/home/home.js');
       await initHomePage(app);
     }
   } catch (err) {
@@ -66,15 +67,24 @@ async function route(): Promise<void> {
       <div class="page">
         <div class="container" style="display:flex;align-items:center;justify-content:center;min-height:100vh">
           <div class="card text-center" style="max-width:400px">
-            <h2>Something went wrong</h2>
-            <p class="text-secondary mt-4">Failed to load this page. Please try again.</p>
-            <button class="btn btn-primary mt-6" onclick="window.location.reload()">Reload</button>
+            <h2>Página não pôde ser carregada</h2>
+            <p class="text-secondary mt-4">${err instanceof Error ? err.message : 'Erro ao inicializar página'}</p>
+            <button class="btn btn-primary mt-6" onclick="window.location.reload()">Recarregar</button>
           </div>
         </div>
       </div>
     `;
   }
 }
+
+// Global unhandled error handlers
+window.addEventListener('error', (event) => {
+  console.error('[LANCam Error]', event.error);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('[LANCam Promise Rejection]', event.reason);
+});
 
 // Navigate without full page reload
 export function navigate(path: string): void {

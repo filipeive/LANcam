@@ -47,6 +47,9 @@ async function startEmbeddedServer(): Promise<number> {
   }
 }
 
+app.commandLine.appendSwitch('ignore-certificate-errors');
+app.commandLine.appendSwitch('allow-insecure-localhost');
+
 function createWindow(port: number): void {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -69,10 +72,13 @@ function createWindow(port: number): void {
     callback(true);
   });
 
-  const url = `https://localhost:${port}`;
-  mainWindow.loadURL(url).catch(() => {
-    // Fallback to HTTP if SSL certs were not generated yet
-    mainWindow?.loadURL(`http://localhost:${port - 100 || 3478}`);
+  const httpsUrl = `https://localhost:${port}`;
+  const httpUrl = `http://localhost:${port + 1}`;
+
+  mainWindow.loadURL(httpsUrl).catch(() => {
+    mainWindow?.loadURL(httpUrl).catch((err) => {
+      console.error('[Electron Desktop] Failed to load URL:', err);
+    });
   });
 
   mainWindow.on('closed', () => {

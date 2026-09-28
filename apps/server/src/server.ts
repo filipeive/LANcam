@@ -149,21 +149,29 @@ export async function createServer(config: ServerConfig): Promise<{
 
     if (hostHeader) {
       const forwardedProto = req.headers['x-forwarded-proto'] as string | undefined;
-      let proto = forwardedProto || (req.secure ? 'https' : 'http');
-      if (isHttps && !hostHeader.includes('localhost') && !hostHeader.includes('127.0.0.1')) {
-        proto = 'https';
+      let proto = forwardedProto || (req.secure ? 'https' : (isHttps ? 'https' : 'http'));
+
+      let formattedHost = hostHeader;
+      // If generating HTTPS URL, replace HTTP port (e.g. :3479) with HTTPS port (e.g. :3478)
+      if (proto === 'https' && formattedHost.includes(`:${config.httpPort}`)) {
+        formattedHost = formattedHost.replace(`:${config.httpPort}`, `:${config.port}`);
+      } else if (proto === 'http' && formattedHost.includes(`:${config.port}`)) {
+        formattedHost = formattedHost.replace(`:${config.port}`, `:${config.httpPort}`);
       }
-      return `${proto}://${hostHeader}${pathPrefix}`;
+
+      return `${proto}://${formattedHost}${pathPrefix}`;
     }
 
     if (req.headers.referer) {
       try {
         const refUrl = new URL(req.headers.referer);
         let proto = isHttps ? refUrl.protocol : 'http:';
-        if (isHttps && !refUrl.host.includes('localhost') && !refUrl.host.includes('127.0.0.1')) {
+        let host = refUrl.host;
+        if (isHttps && host.includes(`:${config.httpPort}`)) {
+          host = host.replace(`:${config.httpPort}`, `:${config.port}`);
           proto = 'https:';
         }
-        return `${proto}//${refUrl.host}${pathPrefix}`;
+        return `${proto}//${host}${pathPrefix}`;
       } catch {
         // ignore
       }
@@ -338,7 +346,27 @@ export async function createServer(config: ServerConfig): Promise<{
   let server: https.Server | http.Server;
   let httpServer: http.Server | undefined;
 
-  const hasCerts = fs.existsSync(config.certPath) && fs.existsSync(config.keyPath);
+  let hasCerts = fs.existsSync(config.certPath) && fs.existsSync(config.keyPath);
+
+  if (!hasCerts) {
+    try {
+      const certDir = path.dirname(config.certPath);
+      if (!fs.existsSync(certDir)) {
+        fs.mkdirSync(certDir, { recursive: true });
+      }
+      const { execSync } = await import('child_process');
+      execSync(
+        `openssl req -x509 -newkey rsa:2048 -nodes -keyout "${config.keyPath}" -out "${config.certPath}" -days 3650 -subj "/CN=lancam.local/O=LANCam/C=PT"`,
+        { stdio: 'ignore' },
+      );
+      hasCerts = fs.existsSync(config.certPath) && fs.existsSync(config.keyPath);
+      if (hasCerts) {
+        log.info('Auto-generated self-signed TLS certificates for local HTTPS');
+      }
+    } catch {
+      // OpenSSL auto-generation failed or not available — fallback to HTTP
+    }
+  }
 
   if (hasCerts) {
     const sslOptions = {
@@ -353,9 +381,7 @@ export async function createServer(config: ServerConfig): Promise<{
     });
   } else {
     log.warn(
-      'TLS certificates not found — starting HTTP server. ' +
-      'Camera access will NOT work on mobile browsers. ' +
-      'Run "npm run setup:certs" to generate certificates.',
+      'TLS certificates not found — starting HTTP server.',
     );
     server = http.createServer(app);
   }

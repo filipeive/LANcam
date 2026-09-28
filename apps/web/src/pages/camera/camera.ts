@@ -605,7 +605,17 @@ function showError(message: string): void {
   panel.classList.remove('hidden');
 
   const isHttp = window.location.protocol === 'http:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-  const httpsUrl = `https://${window.location.host}${window.location.pathname}${window.location.search}`;
+  let httpsHost = window.location.host;
+
+  // If accessed via standalone HTTP port (e.g. 3479), map to HTTPS port (3478)
+  if (window.location.port && window.location.port !== '80' && window.location.port !== '443') {
+    const portNum = parseInt(window.location.port, 10);
+    // If port is 3479 (httpPort = port + 1), HTTPS port is port - 1 (3478)
+    const httpsPortNum = portNum === 3479 ? 3478 : portNum - 1;
+    httpsHost = `${window.location.hostname}:${httpsPortNum}`;
+  }
+
+  const httpsUrl = `https://${httpsHost}${window.location.pathname}${window.location.search}`;
 
   if (isHttp || message.includes('HTTPS') || message.includes('permissão') || message.includes('permission')) {
     msgEl.innerHTML = `
@@ -624,7 +634,7 @@ function showError(message: string): void {
           </a>
           
           <div style="margin-top:10px;font-size:0.775rem;color:var(--color-text-muted);line-height:1.4">
-            * Se surgir o aviso "Sua conexão não é privada", clique em <b>Avançado</b> → <b>Ir para 146.235.224.99 (não seguro)</b>.
+            * Se surgir o aviso "Sua conexão não é privada", clique em <b>Avançado</b> → <b>Ir para ${escapeHtml(window.location.hostname)} (não seguro)</b>.
           </div>
         </div>
       </div>
